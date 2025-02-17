@@ -1,0 +1,92 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+const maxLinesPerTarget = 2 // Limit to 2 lines per target
+
+func main() {
+	// Open the search strings file
+	searchFile, err := os.Open("search_strings.txt")
+	if err != nil {
+		fmt.Println("Error opening search strings file:", err)
+		return
+	}
+	defer searchFile.Close()
+
+	// Initialize the map to hold the target as the key and []string as the value
+	targetLines := make(map[string][]string)
+
+	// Read the search strings file and populate the map with empty slices
+	scanner := bufio.NewScanner(searchFile)
+	for scanner.Scan() {
+		target := strings.TrimSpace(scanner.Text())
+		if target != "" {
+			targetLines[target] = []string{}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Error reading search strings file:", err)
+		return
+	}
+
+	// Open the data file
+	dataFile, err := os.Open("data.txt")
+	if err != nil {
+		fmt.Println("Error opening data file:", err)
+		return
+	}
+	defer dataFile.Close()
+
+	// Scan through data file line by line
+	dataScanner := bufio.NewScanner(dataFile)
+	for dataScanner.Scan() {
+		line := dataScanner.Text()
+		for target := range targetLines {
+			if strings.Contains(line, target) {
+				if len(targetLines[target]) < maxLinesPerTarget {
+					targetLines[target] = append(targetLines[target], line)
+				}
+			}
+		}
+	}
+	if err := dataScanner.Err(); err != nil {
+		fmt.Println("Error reading data file:", err)
+		return
+	}
+
+	// Create output directory if it doesn't exist
+	outputDir := "./output"
+	err = os.MkdirAll(outputDir, 0755)
+	if err != nil {
+		fmt.Println("Error creating output directory:", err)
+		return
+	}
+
+	// Write each target's lines to a separate text file
+	for target, lines := range targetLines {
+		outputFilePath := filepath.Join(outputDir, target+".txt")
+
+		file, err := os.Create(outputFilePath)
+		if err != nil {
+			fmt.Printf("Error creating file for target '%s': %v\n", target, err)
+			continue
+		}
+		defer file.Close()
+
+		writer := bufio.NewWriter(file)
+		for _, line := range lines {
+			_, _ = writer.WriteString(line + "\n")
+		}
+		writer.Flush()
+
+		fmt.Printf("Wrote %d lines to %s\n", len(lines), outputFilePath)
+	}
+
+	fmt.Println("Processing complete!")
+}
